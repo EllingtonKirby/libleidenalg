@@ -12,11 +12,12 @@ add_library(libleidenalg
   CPMVertexPartition.cpp
   RBConfigurationVertexPartition.cpp
   RBERVertexPartition.cpp
-
+  ContiguousConstrainedVertexPartition.cpp
 )
 
 set_target_properties(libleidenalg PROPERTIES VERSION ${PROJECT_VERSION})
 set_target_properties(libleidenalg PROPERTIES SOVERSION 1)
+# target_compile_definitions(libleidenalg PRIVATE DEBUG)
 
 # Generate export header include file
 include(GenerateExportHeader)
