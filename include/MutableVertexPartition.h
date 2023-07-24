@@ -61,6 +61,7 @@ class LIBLEIDENALG_EXPORT MutableVertexPartition
     vector<size_t> get_community(size_t comm);
     vector< vector<size_t> > get_communities();
     size_t n_communities();
+    size_t n_non_empty_communitites();
 
     void move_node(size_t v,size_t new_comm);
     virtual double diff_move(size_t v, size_t new_comm)
@@ -95,6 +96,9 @@ class LIBLEIDENALG_EXPORT MutableVertexPartition
 
     inline double total_weight_in_all_comms()         { return this->_total_weight_in_all_comms; };
     inline size_t total_possible_edges_in_all_comms() { return this->_total_possible_edges_in_all_comms; };
+
+    inline vector<double> feature_weight_in_comm(size_t comm) { return comm < _n_communities ? vector<double>(this->_feature_weight_in_comm[comm]) : vector<double>(this->graph->n_node_features()); }
+    inline vector<double> squared_feature_weight_in_comm(size_t comm) { return comm < _n_communities ? vector<double>(this->_squared_feature_weight_in_comm[comm]) : vector<double>(this->graph->n_node_features()); }
 
     inline double weight_to_comm(size_t v, size_t comm)
     {
@@ -164,6 +168,10 @@ class LIBLEIDENALG_EXPORT MutableVertexPartition
     double _total_weight_in_all_comms;
     size_t _total_possible_edges_in_all_comms;
     size_t _n_communities;
+
+    // Keep track of the aggregate feature value of each community
+    vector<vector<double> > _feature_weight_in_comm;
+    vector<vector<double> > _squared_feature_weight_in_comm;
 
     vector<size_t> _empty_communities;
 

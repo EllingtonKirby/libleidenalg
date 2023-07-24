@@ -119,6 +119,11 @@ size_t MutableVertexPartition::n_communities()
   return this->_n_communities;
 }
 
+size_t MutableVertexPartition::n_non_empty_communitites() 
+{
+  return this->_n_communities - this->_empty_communities.size();
+}
+
 /****************************************************************************
   Initialise all the administration based on the membership vector.
 *****************************************************************************/
@@ -129,6 +134,7 @@ void MutableVertexPartition::init_admin()
     cerr << "void MutableVertexPartition::init_admin()" << endl;
   #endif
   size_t n = this->graph->vcount();
+  size_t num_node_features = this->graph->n_node_features();
 
   // First determine number of communities (assuming they are consecutively numbered
   this->update_n_communities();
@@ -144,6 +150,10 @@ void MutableVertexPartition::init_admin()
   this->_csize.resize(this->_n_communities);
   this->_cnodes.clear();
   this->_cnodes.resize(this->_n_communities);
+  this->_feature_weight_in_comm.clear();
+  this->_feature_weight_in_comm.resize(this->_n_communities, vector<double>(num_node_features));
+  this->_squared_feature_weight_in_comm.clear();
+  this->_squared_feature_weight_in_comm.resize(this->_n_communities, vector<double>(num_node_features));
 
   this->_current_node_cache_community_from = n + 1; this->_cached_weight_from_community.resize(this->_n_communities, 0);
   this->_current_node_cache_community_to = n + 1;   this->_cached_weight_to_community.resize(this->_n_communities, 0);
@@ -165,6 +175,13 @@ void MutableVertexPartition::init_admin()
     this->_csize[v_comm] += this->graph->node_size(v);
     // Update the community size
     this->_cnodes[v_comm] += 1;
+    // Update the community feature weight
+    for (size_t f  = 0; f < num_node_features; f++) 
+    {
+      double node_feature_weight = this->graph->node_feature_weight(v, f);
+      this->_feature_weight_in_comm[v_comm][f] += node_feature_weight;
+      this->_squared_feature_weight_in_comm[v_comm][f] += node_feature_weight * node_feature_weight;
+    }
   }
 
   size_t m = graph->ecount();
@@ -285,6 +302,8 @@ void MutableVertexPartition::relabel_communities(vector<size_t> const& new_comm_
   vector<double> new_total_weight_to_comm(nbcomms, 0.0);
   vector<double> new_csize(nbcomms, 0);
   vector<size_t> new_cnodes(nbcomms, 0);
+  vector<vector<double>> new_feature_weight_in_comm(nbcomms, vector<double>(this->graph->n_node_features()));
+  vector<vector<double>> new_squared_feature_weight_in_comm(nbcomms, vector<double>(this->graph->n_node_features()));
 
   // Relabel community admin
   for (size_t c = 0; c < new_comm_id.size(); c++) {
@@ -295,6 +314,8 @@ void MutableVertexPartition::relabel_communities(vector<size_t> const& new_comm_
       new_total_weight_to_comm[new_c] = this->_total_weight_to_comm[c];
       new_csize[new_c] = this->_csize[c];
       new_cnodes[new_c] = this->_cnodes[c];
+      new_feature_weight_in_comm[new_c] = this->_feature_weight_in_comm[c];
+      new_squared_feature_weight_in_comm[new_c] = this->_squared_feature_weight_in_comm[c];
     }
   }
 
@@ -303,6 +324,8 @@ void MutableVertexPartition::relabel_communities(vector<size_t> const& new_comm_
   this->_total_weight_to_comm = new_total_weight_to_comm;
   this->_csize = new_csize;
   this->_cnodes = new_cnodes;
+  this->_feature_weight_in_comm = new_feature_weight_in_comm;
+  this->_squared_feature_weight_in_comm = new_squared_feature_weight_in_comm;
 
   this->_empty_communities.clear();
   for (size_t c = 0; c < nbcomms; c++) {
@@ -514,11 +537,13 @@ size_t MutableVertexPartition::add_empty_community()
 
   size_t new_comm = this->_n_communities - 1;
 
-  this->_csize.resize(this->_n_communities);                  this->_csize[new_comm] = 0;
-  this->_cnodes.resize(this->_n_communities);                 this->_cnodes[new_comm] = 0;
-  this->_total_weight_in_comm.resize(this->_n_communities);   this->_total_weight_in_comm[new_comm] = 0;
-  this->_total_weight_from_comm.resize(this->_n_communities); this->_total_weight_from_comm[new_comm] = 0;
-  this->_total_weight_to_comm.resize(this->_n_communities);   this->_total_weight_to_comm[new_comm] = 0;
+  this->_csize.resize(this->_n_communities);                          this->_csize[new_comm] = 0;
+  this->_cnodes.resize(this->_n_communities);                         this->_cnodes[new_comm] = 0;
+  this->_total_weight_in_comm.resize(this->_n_communities);           this->_total_weight_in_comm[new_comm] = 0;
+  this->_total_weight_from_comm.resize(this->_n_communities);         this->_total_weight_from_comm[new_comm] = 0;
+  this->_total_weight_to_comm.resize(this->_n_communities);           this->_total_weight_to_comm[new_comm] = 0;
+  this->_feature_weight_in_comm.resize(this->_n_communities,          vector<double>(this->graph->n_node_features()));         
+  this->_squared_feature_weight_in_comm.resize(this->_n_communities,  vector<double>(this->graph->n_node_features())); 
 
   this->_cached_weight_all_community.resize(this->_n_communities);
   this->_cached_weight_from_community.resize(this->_n_communities);
@@ -560,9 +585,15 @@ void MutableVertexPartition::move_node(size_t v,size_t new_comm)
 
   // Keep track of all possible edges in all communities;
   double node_size = this->graph->node_size(v);
+  double num_features = this->graph->n_node_features();
+  vector<double> node_feature_weight = this->graph->node_feature_weight(v);
   size_t old_comm = this->_membership[v];
   #ifdef DEBUG
     cerr << "Node size: " << node_size << ", old comm: " << old_comm << ", new comm: " << new_comm << endl;
+    for (double feature: node_feature_weight) 
+    {
+      cerr << "Node Feature Weight: " << feature << endl;
+    }
   #endif
   // Incidentally, this is independent of whether we take into account self-loops or not
   // (i.e. whether we count as n_c^2 or as n_c(n_c - 1). Be careful to do this before the
@@ -579,11 +610,33 @@ void MutableVertexPartition::move_node(size_t v,size_t new_comm)
   // Remove from old community
   #ifdef DEBUG
     cerr << "Removing from old community " << old_comm << ", community size: " << this->_csize[old_comm] << endl;
+    for (double feature : _feature_weight_in_comm[old_comm]) 
+    {
+      cerr << "Removing feature weight from old community " << old_comm << ", current weight: " << feature << endl;
+    }
+    for (double feature : _squared_feature_weight_in_comm[old_comm]) 
+    {
+      cerr << "Removing feature weight from old community " << old_comm << ", current squared weight: " << feature << endl;
+    }
   #endif
   this->_cnodes[old_comm] -= 1;
   this->_csize[old_comm] -= node_size;
+  for (size_t f = 0; f < num_features; f++)
+  {
+    double feature_weight = node_feature_weight[f];
+    this->_feature_weight_in_comm[old_comm][f] -= feature_weight;
+    this->_squared_feature_weight_in_comm[old_comm][f] -= feature_weight * feature_weight;
+  }
   #ifdef DEBUG
     cerr << "Removed from old community." << endl;
+    for (double feature : _feature_weight_in_comm[old_comm]) 
+    {
+      cerr << "Removed feature weight from old community " << old_comm << ", current weight: " << feature << endl;
+    }
+    for (double feature : _squared_feature_weight_in_comm[old_comm]) 
+    {
+      cerr << "Removed feature weight from old community " << old_comm << ", current squared weight: " << feature << endl;
+    }
   #endif
 
   // We have to use the size of the set of nodes rather than the csize
@@ -595,6 +648,9 @@ void MutableVertexPartition::move_node(size_t v,size_t new_comm)
       cerr << "Adding community " << old_comm << " to empty communities." << endl;
     #endif
     this->_empty_communities.push_back(old_comm);
+    // Subtraction with floating point arithmetic might not reach exactly 0, so we manually set all features to 0
+    std::fill(this->_feature_weight_in_comm[old_comm].begin(), this->_feature_weight_in_comm[old_comm].end(), 0.0);
+    std::fill(this->_squared_feature_weight_in_comm[old_comm].begin(), this->_squared_feature_weight_in_comm[old_comm].end(), 0.0);
     #ifdef DEBUG
       cerr << "Added community " << old_comm << " to empty communities." << endl;
     #endif
@@ -624,14 +680,35 @@ void MutableVertexPartition::move_node(size_t v,size_t new_comm)
 
   #ifdef DEBUG
     cerr << "Adding to new community " << new_comm << ", community size: " << this->_csize[new_comm] << endl;
+    for (double feature : _feature_weight_in_comm[new_comm]) 
+    {
+      cerr << "Adding feature weight to new community " << new_comm << ", current weight: " << feature << endl;
+    }
+    for (double feature : _squared_feature_weight_in_comm[new_comm]) 
+    {
+      cerr << "Adding feature weight to new community " << new_comm << ", current squared weight: " << feature << endl;
+    }
   #endif
   // Add to new community
   this->_cnodes[new_comm] += 1;
   this->_csize[new_comm] += this->graph->node_size(v);
-
+  for (size_t f = 0; f < num_features; f++)
+  {
+    double feature_weight = node_feature_weight[f];
+    this->_feature_weight_in_comm[new_comm][f] += feature_weight;
+    this->_squared_feature_weight_in_comm[new_comm][f] += feature_weight * feature_weight;
+  }
   // Switch outgoing links
   #ifdef DEBUG
     cerr << "Added to new community." << endl;
+    for (double feature : _feature_weight_in_comm[new_comm]) 
+    {
+      cerr << "Added feature weight to new community " << new_comm << ", current weight: " << feature << endl;
+    }
+    for (double feature : _squared_feature_weight_in_comm[new_comm]) 
+    {
+      cerr << "Added feature weight to new community " << new_comm << ", current squared weight: " << feature << endl;
+    }
   #endif
 
   // Use set for incident edges, because self loop appears twice
