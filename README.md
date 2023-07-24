@@ -1,3 +1,6 @@
+# CHANGES ON THIS FORK
+NOTE: This fork includes a change that introduces a new partitioning method which uses a supplementary data structure. To expose this method in the python API I have pushed a separate change to a [different fork](https://github.com/EllingtonKirby/leidenalg.git).  Thus both of forks are required to use this new partitioning method. 
+
 # Introduction
 
 This package implements the Leiden algorithm in `C++`.  It relies on
