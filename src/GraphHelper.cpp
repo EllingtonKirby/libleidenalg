@@ -421,9 +421,8 @@ void Graph::set_default_attributes()
     cerr << "Setting default node attributes." << endl;
   #endif
   size_t n = this->vcount();
-  size_t num_features = this->_n_node_features;
-  this->_node_attributes.clear(); 
-  this->_node_attributes.resize(n);
+  this->_n_node_features = 0;
+  this->_node_attributes.resize(n, vector<double>());
 }
 
 

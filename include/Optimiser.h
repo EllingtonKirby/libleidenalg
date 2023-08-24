@@ -2,6 +2,7 @@
 #define OPTIMISER_H
 #include "GraphHelper.h"
 #include "MutableVertexPartition.h"
+#include "ContiguousConstrainedVertexPartition.h"
 #include <set>
 #include <map>
 #include <cfloat>
@@ -68,6 +69,8 @@ class LIBLEIDENALG_EXPORT Optimiser
     double merge_nodes_constrained(vector<MutableVertexPartition*> partitions, vector<double> layer_weights, MutableVertexPartition* constrained_partition);
     double merge_nodes_constrained(vector<MutableVertexPartition*> partitions, vector<double> layer_weights, int consider_comms, MutableVertexPartition* constrained_partition);
     double merge_nodes_constrained(vector<MutableVertexPartition*> partitions, vector<double> layer_weights, int consider_comms, MutableVertexPartition* constrained_partition, size_t max_comm_size);
+
+    bool check_community_connected(MutableVertexPartition *partition, size_t v_comm);
 
     inline void set_rng_seed(size_t seed) { igraph_rng_seed(&rng, seed); };
 

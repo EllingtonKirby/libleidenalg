@@ -7,11 +7,11 @@ class LIBLEIDENALG_EXPORT ContiguousConstrainedVertexPartition : public LinearRe
 {
   public:
     ContiguousConstrainedVertexPartition(Graph* graph,
-          vector<size_t> const& membership, double resolution_parameter);
+          vector<size_t> const& membership, double resolution_parameter, double disconnect_penalty);
     ContiguousConstrainedVertexPartition(Graph* graph,
           vector<size_t> const& membership);
     ContiguousConstrainedVertexPartition(Graph* graph,
-      double resolution_parameter);
+      double resolution_parameter, double disconnect_penalty);
     ContiguousConstrainedVertexPartition(Graph* graph);
     virtual ~ContiguousConstrainedVertexPartition();
     virtual ContiguousConstrainedVertexPartition* create(Graph* graph);
@@ -19,9 +19,13 @@ class LIBLEIDENALG_EXPORT ContiguousConstrainedVertexPartition : public LinearRe
 
     virtual double diff_move(size_t v, size_t new_comm);
     virtual double quality(double resolution_parameter);
+    double merge_diff_move(size_t v, size_t new_comm);
+    bool check_community_connected_except_target(size_t v_comm, size_t target);
 
   protected:
   private:
+  double disconnect_penalty = 0;
+
   inline double compute_online_variance(vector<double> const& feature_weight, vector<double> const& squared_feature_weight, size_t num_features, size_t size) {
     double total_variance = 0.0;
     for (size_t f = 0; f < num_features; f++) {
