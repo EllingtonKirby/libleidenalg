@@ -91,6 +91,7 @@ Graph::Graph(igraph_t* graph,
   this->_correct_self_loops = correct_self_loops;
   igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
   this->init_admin();
+  this->set_default_attributes();
 }
 
 Graph::Graph(igraph_t* graph,
@@ -115,6 +116,7 @@ Graph::Graph(igraph_t* graph,
   this->_node_self_weights = node_self_weights;
   igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
   this->init_admin();
+  this->set_default_attributes();
 }
 
 Graph::Graph(igraph_t* graph,
@@ -132,6 +134,42 @@ Graph::Graph(igraph_t* graph,
   if (node_sizes.size() != this->vcount())
     throw Exception("Node size vector inconsistent length with the vertex count of the graph.");
   this->_node_sizes = node_sizes;
+
+  this->_correct_self_loops = correct_self_loops;
+  igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
+  this->init_admin();
+  this->set_self_weights();
+  this->set_default_attributes();
+}
+
+Graph::Graph(igraph_t* graph,
+  vector<double> const& edge_weights,
+  vector<double> const& node_sizes, 
+  vector<vector<double>> const& node_attributes, int correct_self_loops)
+{
+  this->_graph = graph;
+  this->_remove_graph = false;
+
+  if (edge_weights.size() != this->ecount())
+    throw Exception("Edge weights vector inconsistent length with the edge count of the graph.");
+  this->_edge_weights = edge_weights;
+  this->_is_weighted = true;
+
+  if (node_sizes.size() != this->vcount())
+    throw Exception("Node size vector inconsistent length with the vertex count of the graph.");
+  this->_node_sizes = node_sizes;
+
+  if (node_attributes.size() != this->vcount())
+    throw Exception("Note attributes vector inconsistent length with the vertex count of the graph.");
+  size_t num_features = node_attributes[0].size();
+  for (size_t f = 0; f < node_attributes.size(); f++) {
+    if (node_attributes[f].size() != num_features) 
+    {
+      throw Exception("Individual feature length vectors inconsistent. Every node must have equal length feature vector.");
+    }
+  }
+  this->_node_attributes = node_attributes;
+  this->_n_node_features = num_features;
 
   this->_correct_self_loops = correct_self_loops;
   igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
@@ -159,6 +197,7 @@ Graph::Graph(igraph_t* graph,
   igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
   this->init_admin();
   this->set_self_weights();
+  this->set_default_attributes();
 }
 
 Graph* Graph::GraphFromEdgeWeights(igraph_t* graph, vector<double> const& edge_weights, int correct_self_loops)
@@ -173,6 +212,7 @@ Graph* Graph::GraphFromEdgeWeights(igraph_t* graph, vector<double> const& edge_w
   igraph_vector_int_init(&g->_temp_igraph_vector, g->vcount());
   g->init_admin();
   g->set_self_weights();
+  g->set_default_attributes();
 
   return g;
 }
@@ -189,6 +229,7 @@ Graph* Graph::GraphFromEdgeWeights(igraph_t* graph, vector<double> const& edge_w
   igraph_vector_int_init(&g->_temp_igraph_vector, g->vcount());
   g->init_admin();
   g->set_self_weights();
+  g->set_default_attributes();
 
   return g;
 }
@@ -206,7 +247,8 @@ Graph* Graph::GraphFromNodeSizes(igraph_t* graph, vector<double> const& node_siz
   igraph_vector_int_init(&g->_temp_igraph_vector, g->vcount());
   g->init_admin();
   g->set_self_weights();
-  
+  g->set_default_attributes();
+
   return g;
 }
 
@@ -229,7 +271,35 @@ Graph* Graph::GraphFromNodeSizes(igraph_t* graph, vector<double> const& node_siz
   igraph_vector_int_init(&g->_temp_igraph_vector, g->vcount());
   g->init_admin();
   g->set_self_weights();
+  g->set_default_attributes();
 
+  return g;
+}
+
+Graph* Graph::GraphFromNodeAttributes(igraph_t* graph, 
+  vector<vector<double>> const& node_attributes, int correct_self_loops)
+{
+  Graph* g = new Graph(graph, correct_self_loops);
+
+  if (node_attributes.size() != g->vcount())
+    throw Exception("Note attributes vector inconsistent length with the vertex count of the graph.");
+  size_t num_features = node_attributes[0].size();
+  for (size_t f = 0; f < node_attributes.size(); f++) {
+    if (node_attributes[f].size() != num_features) 
+    {
+      throw Exception("Individual feature length vectors inconsistent. Every node must have equal length feature vector.");
+    }
+  }
+  g->_node_attributes = node_attributes;
+  g->_n_node_features = num_features;
+  g->_is_weighted = true;
+  g->set_default_node_size();
+  igraph_vector_int_init(&g->_temp_igraph_vector, g->vcount());
+  g->init_admin();
+  g->set_self_weights();
+  #ifdef DEBUG
+    cerr << "Created graph with node attributes. Feature length: " << num_features << endl;
+  #endif
   return g;
 }
 
@@ -243,6 +313,7 @@ Graph::Graph(igraph_t* graph, int correct_self_loops)
   igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
   this->init_admin();
   this->set_self_weights();
+  this->set_default_attributes();
 }
 
 Graph::Graph(igraph_t* graph)
@@ -257,6 +328,7 @@ Graph::Graph(igraph_t* graph)
   igraph_vector_int_init(&this->_temp_igraph_vector, this->vcount());
   this->init_admin();
   this->set_self_weights();
+  this->set_default_attributes();
 }
 
 Graph::~Graph()
@@ -342,6 +414,17 @@ void Graph::set_self_weights()
     #endif
   }
 }
+
+void Graph::set_default_attributes()
+{
+  #ifdef DEBUG
+    cerr << "Setting default node attributes." << endl;
+  #endif
+  size_t n = this->vcount();
+  this->_n_node_features = 0;
+  this->_node_attributes.resize(n, vector<double>());
+}
+
 
 void Graph::init_admin()
 {
@@ -687,6 +770,8 @@ Graph* Graph::collapse_graph(MutableVertexPartition* partition)
   vector<double> edge_weight_to_community(n_collapsed, 0.0);
   vector<bool> neighbour_comm_added(n_collapsed, false);
 
+  vector<vector<double>> node_attributes_in_collapsed_community(n_collapsed, vector<double>(this->_n_node_features));
+
   // collapsed edges for new graph
   igraph_vector_int_t edges;
   igraph_vector_int_init(&edges, 0);
@@ -716,6 +801,10 @@ Graph* Graph::collapse_graph(MutableVertexPartition* partition)
             }
             edge_weight_to_community[u_comm] += w;
         }
+        // Sum feature weights in community
+        for (size_t f = 0; f < this->_n_node_features; f++) {
+          node_attributes_in_collapsed_community[v_comm][f] += this->node_feature_weight(v, f);
+        }
     }
 
     for (size_t u_comm : neighbour_communities) {
@@ -742,8 +831,16 @@ Graph* Graph::collapse_graph(MutableVertexPartition* partition)
   vector<double> csizes(n_collapsed, 0);
   for (size_t c = 0; c < partition->n_communities(); c++)
     csizes[c] = partition->csize(c);
-
-  Graph* G = new Graph(graph, collapsed_weights, csizes, this->_correct_self_loops);
+  
+  Graph* G;
+  if (this->_n_node_features == 0)
+  {
+    G = new Graph(graph, collapsed_weights, csizes, this->_correct_self_loops);
+  }
+  else 
+  {
+    G = new Graph(graph, collapsed_weights, csizes, node_attributes_in_collapsed_community, this->_correct_self_loops);
+  }
   G->_remove_graph = true;
   #ifdef DEBUG
     cerr << "exit Graph::collapse_graph(vector<size_t> membership)" << endl << endl;

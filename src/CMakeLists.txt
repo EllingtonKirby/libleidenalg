@@ -12,7 +12,7 @@ add_library(libleidenalg
   CPMVertexPartition.cpp
   RBConfigurationVertexPartition.cpp
   RBERVertexPartition.cpp
-
+  ContiguousConstrainedVertexPartition.cpp
 )
 
 set_target_properties(libleidenalg PROPERTIES VERSION ${PROJECT_VERSION})

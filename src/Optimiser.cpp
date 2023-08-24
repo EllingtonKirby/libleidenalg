@@ -363,6 +363,13 @@ double Optimiser::optimise_partition(vector<MutableVertexPartition*> partitions,
   q = 0.0;
   partitions[0]->renumber_communities();
   partitions[0]->renumber_communities(fixed_nodes, fixed_membership);
+  for (size_t c = 0; c < partitions[0]->n_communities(); c++)
+  {
+    if (!check_community_connected(partitions[0], c))
+    {
+      std::cout << "After partitioning, found disconnected community " << c << endl;
+    }
+  }
   vector<size_t> const& membership = partitions[0]->membership();
   // We only renumber the communities for the first graph,
   // since the communities for the other graphs should just be equal
@@ -1441,4 +1448,42 @@ double Optimiser::merge_nodes_constrained(vector<MutableVertexPartition*> partit
     #endif //DEBUG
   }
   return total_improv;
+}
+
+
+bool Optimiser::check_community_connected(MutableVertexPartition *partition, size_t v_comm) 
+{
+  vector<bool> seen_nodes = vector<bool>(partition->get_graph()->vcount(), false);
+  vector<size_t> community = partition->get_community(v_comm);
+
+  if (community.size() == 0)
+  {
+    return true;
+  }
+
+  deque<size_t> vertex_order = deque<size_t>();
+  vertex_order.push_back(community[0]);
+  int num_seen_elements = 0;
+
+  while (!vertex_order.empty()) 
+  {
+    size_t v = vertex_order.front(); vertex_order.pop_front();
+    if (seen_nodes[v]) 
+    {
+      continue;
+    }
+    vector<size_t> neighbors = partition->get_graph()->get_neighbours(v, IGRAPH_ALL);
+    for (size_t neighbor : neighbors)
+    {
+      if (partition->membership(neighbor) == v_comm)
+      {
+        vertex_order.push_back(neighbor);
+      }
+    }
+
+    seen_nodes[v] = true;
+    num_seen_elements++;
+  }
+  
+  return num_seen_elements == partition->csize(v_comm);
 }

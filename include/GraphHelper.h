@@ -83,6 +83,10 @@ class LIBLEIDENALG_EXPORT Graph
     Graph(igraph_t* graph,
       vector<double> const& edge_weights,
       vector<double> const& node_sizes);
+    Graph(igraph_t* graph,
+      vector<double> const& edge_weights,
+      vector<double> const& node_sizes, 
+      vector<vector<double> > const& node_attributes, int correct_self_loops);
     Graph(igraph_t* graph, int correct_self_loops);
     Graph(igraph_t* graph);
     Graph();
@@ -92,6 +96,7 @@ class LIBLEIDENALG_EXPORT Graph
     static Graph* GraphFromEdgeWeights(igraph_t* graph, vector<double> const& edge_weights);
     static Graph* GraphFromNodeSizes(igraph_t* graph, vector<double> const& node_sizes, int correct_self_loops);
     static Graph* GraphFromNodeSizes(igraph_t* graph, vector<double> const& node_sizes);
+    static Graph* GraphFromNodeAttributes(igraph_t* graph, vector<vector<double> > const& node_attributes, int correct_self_loops);
 
     int has_self_loops();
     double possible_edges();
@@ -149,6 +154,18 @@ class LIBLEIDENALG_EXPORT Graph
     inline double node_self_weight(size_t v)
     { return this->_node_self_weights[v]; };
 
+    // Get a specific element of node feature vector
+    inline double node_feature_weight(size_t v, size_t f)
+    { return this->_node_attributes[v][f]; };
+    
+    // Get node feature vector
+    inline vector<double> node_feature_weight(size_t v)
+    { return vector<double>(this->_node_attributes[v]); };
+
+    // Get number of features per node
+    inline size_t n_node_features()
+    { return this->_n_node_features; }
+
     inline size_t degree(size_t v, igraph_neimode_t mode)
     {
       if (mode == IGRAPH_IN || !this->is_directed())
@@ -189,6 +206,8 @@ class LIBLEIDENALG_EXPORT Graph
     vector<double> _edge_weights; // Used for the weight of the edges.
     vector<double> _node_sizes; // Used for the size of the nodes.
     vector<double> _node_self_weights; // Used for the self weight of the nodes.
+    vector<vector<double> > _node_attributes; // Used for supplemental node data.
+    size_t _n_node_features;
 
     void cache_neighbours(size_t v, igraph_neimode_t mode);
     vector<size_t> _cached_neighs_from; size_t _current_node_cache_neigh_from;
@@ -213,7 +232,7 @@ class LIBLEIDENALG_EXPORT Graph
     void set_default_edge_weight();
     void set_default_node_size();
     void set_self_weights();
-
+    void set_default_attributes();
 };
 
 // We need this ugly way to include the MutableVertexPartition
