@@ -3,9 +3,9 @@ cmake_minimum_required (VERSION 3.23)
 # Add etc/cmake to CMake's search path so we can put our private stuff there
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/etc/cmake)
 
-include(version)
+# include(version)
 
-project(libleidenalg VERSION ${PACKAGE_VERSION_BASE})
+project(libleidenalg VERSION 1.0.0)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

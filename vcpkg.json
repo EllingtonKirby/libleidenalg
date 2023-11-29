@@ -1,6 +1,6 @@
 {
   "name": "libleidenalg",
-  "version": "$Format:%(describe)$",
+  "version": "0",
   "maintainers": "V.A. Traag <v.a.traag@cwts.leidenuniv.nl>",
   "description": "Leiden is a general algorithm for methods of community detection in large networks.",
   "homepage": "https://github.com/vtraag/libleidenalg",
